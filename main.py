@@ -1,63 +1,62 @@
-import customtkinter as ctk
+import GPUtil
 import psutil
 import time
-import threading
-import GPUtil
+import customtkinter as ctk
 
-# Function to monitor CPU, Disk, and GPU usage
-def monitor_usage(cpu_label, disk_label, gpu_label):
-    def update_usage():
-        while True:
-            # Get CPU usage as a percentage over a 1-second interval
-            cpu_usage = psutil.cpu_percent(interval=1)
-            cpu_label.configure(text=f"CPU Usage: {cpu_usage}%")
+# Function to get GPU usage (NVIDIA only)
+def get_gpu_usage():
+    try:
+        # Check for NVIDIA GPUs using GPUtil
+        gpus = GPUtil.getGPUs()
+        if gpus:
+            gpu_usage = []
+            for gpu in gpus:
+                usage = gpu.memoryUtil * 100  # GPU memory utilization as percentage
+                gpu_usage.append(f"NVIDIA GPU {gpu.id}: {usage}%")
+            return '\n'.join(gpu_usage)
+        else:
+            return "No NVIDIA GPUs found."
+    except Exception as e:
+        return "Error retrieving NVIDIA GPU usage."
 
-            # Get disk usage for the C: drive (can be customized for other drives)
-            disk_usage = psutil.disk_usage(path='C:\\')  # Change path as needed
-            disk_label.configure(text=f"Disk Usage: {disk_usage.percent}%")
-
-            # Get GPU usage (this assumes you have a GPU available and GPUUtil is installed)
-            gpus = GPUtil.getGPUs()
-            if gpus:
-                gpu_usage = gpus[0].memoryUtil * 100  # Using the first GPU in the list
-                gpu_label.configure(text=f"GPU Usage: {gpu_usage:.2f}%")
-            else:
-                gpu_label.configure(text="GPU Usage: Not Available")
-
-            time.sleep(1)
+# Function to update CPU, Disk, and GPU usage
+def monitor_usage():
+    # Get CPU usage
+    cpu_usage = psutil.cpu_percent(interval=1)
     
-    # Start a new thread to update the usage stats in the background
-    threading.Thread(target=update_usage, daemon=True).start()
+    # Get Disk usage for C drive (or modify as needed)
+    disk_usage = psutil.disk_usage('C:\\')
+    
+    # Get GPU usage (NVIDIA only)
+    gpu_usage = get_gpu_usage()
+    
+    # Return formatted usage details
+    return f"CPU Usage: {cpu_usage}%\nDisk Usage: {disk_usage.percent}%\nGPU Usage:\n{gpu_usage}"
 
-# Setup the main GUI
-def setup_gui():
-    # Create the main window
+# Function to update the display in the CustomTkinter window
+def update_display(status_label):
+    usage = monitor_usage()  # Get the updated usage info
+    status_label.configure(text=usage)
+    status_label.after(1000, update_display, status_label)  # Update every 1 second
+
+# Creating the CustomTkinter window
+def create_gui():
+    # Initialize the window
     root = ctk.CTk()
     root.title("System Usage Monitor")
-
-    # Enable dark mode for the customtkinter window
+    
+    # Set dark mode appearance
     ctk.set_appearance_mode("dark")
-
-    # Set window size and layout
-    root.geometry("400x350")
-    root.resizable(False, False)
-
-    # Create labels to display CPU, Disk, and GPU usage
-    cpu_usage_label = ctk.CTkLabel(root, text="CPU Usage: 0%", font=("Arial", 16))
-    cpu_usage_label.pack(pady=20)
-
-    disk_usage_label = ctk.CTkLabel(root, text="Disk Usage: 0%", font=("Arial", 16))
-    disk_usage_label.pack(pady=20)
-
-    gpu_usage_label = ctk.CTkLabel(root, text="GPU Usage: 0%", font=("Arial", 16))
-    gpu_usage_label.pack(pady=20)
-
-    # Start monitoring CPU, Disk, and GPU usage
-    monitor_usage(cpu_usage_label, disk_usage_label, gpu_usage_label)
-
-    # Start the Tkinter event loop
+    
+    # Create a label to display system usage
+    status_label = ctk.CTkLabel(root, text="Loading system usage...", anchor="w")
+    status_label.pack(pady=10, padx=20, fill="x", anchor="w")
+    
+    # Start the display update loop
+    update_display(status_label)
+    
+    # Run the Tkinter main loop
     root.mainloop()
 
-# Run the GUI
 if __name__ == "__main__":
-    setup_gui()
+    create_gui()
